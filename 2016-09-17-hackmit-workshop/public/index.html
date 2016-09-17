@@ -1,0 +1,113 @@
+<html>
+<head>
+<script src="https://www.gstatic.com/firebasejs/3.4.0/firebase.js"></script>
+<script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+<script src="https://www.gstatic.com/firebasejs/ui/live/0.5/firebase-ui-auth.js"></script>
+<link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/live/0.5/firebase-ui-auth.css" />
+<script type="text/javascript">
+$(document).ready(function() {
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyBN4jm5whAskAnlnzV6dp4JtfoY-IC09to",
+    authDomain: "hackmit-workshop.firebaseapp.com",
+    databaseURL: "https://hackmit-workshop.firebaseio.com",
+    storageBucket: "hackmit-workshop.appspot.com",
+    messagingSenderId: "772899332316"
+  };
+  firebase.initializeApp(config);
+
+  // Set up references
+  var databaseRef = firebase.database().ref();
+  var storageRef = firebase.storage().ref();
+  var auth = firebase.auth();
+
+  // Load data from database
+  databaseRef.limitToLast(10).on('child_added', function(snapshot) {
+    var data = snapshot.val();
+    var line = "<li>" + data.name + ":";
+    if (data.downloadURL) {
+      line += "<img src='" + data.downloadURL + "'/><br />";
+    }
+    line += data.text + "</li>";
+    $("#messages").append(line);
+  });
+
+  // Submit data to the database
+  $("#submit-button").click(function() {
+    var message = $("#message-input").val().trim();
+    var file = $("#file-input").prop("files")[0];
+
+    if (auth.currentUser) {
+      var messageRef = databaseRef.push();
+      if (file) {
+        storageRef.child(messageRef.key).put(file).then(function (snapshot) {
+          var downloadURL = snapshot.downloadURL;
+          messageRef.set({
+            "downloadURL": downloadURL,
+            "name": auth.currentUser.displayName,
+            "text": message
+          });
+        });
+      } else {
+        messageRef.set({
+          "name": auth.currentUser.displayName,
+          "text": message
+        });
+      }
+    } else {
+      console.log("ERROR: NOT LOGGED IN");
+    }
+  });
+
+  // Do some UI configurations for Firebase Authentication
+  var uiConfig = {
+    'signInSuccessUrl': 'localhost:5000',
+    'signInOptions': [
+      firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+    ],
+  };
+      
+  var ui = new firebaseui.auth.AuthUI(firebase.auth());
+  // The start method will wait until the DOM is loaded.
+  ui.start('#firebaseui-auth-container', uiConfig);
+
+  // Show the logged in user
+  auth.onAuthStateChanged(function(user) {
+    if (user) {
+      $("#username").show().text(user.displayName);
+      $("#logout").show();
+      $("#firebaseui-auth-container").hide();
+    } else {
+      $("#username").hide();
+      $("#logout").hide();
+      $("#firebaseui-auth-container").show();
+    }
+  });
+
+  // Logout the user
+  $("#logout").click(function() {
+    auth.signOut();
+  });
+});
+</script>
+
+</head>
+<body>
+
+<!-- UI for Authentication -->
+<div id="auth-display">
+  <div id="firebaseui-auth-container"></div>
+  <p id="username"></p>
+  <button id="logout">Logout</button>
+</div>
+
+<!-- Show messages -->
+<ul id="messages"></ul>
+
+<!-- input messages -->
+<input id="message-input" type="text" placeholder="Type a message" /><br />
+<input id="file-input" type="file" /><br />
+<input id="submit-button" type="submit" />
+
+</body>
+</html>
